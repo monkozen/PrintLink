@@ -1,0 +1,66 @@
+# PrintLink — Android (Kotlin/Gradle) + Windows (.NET)
+# Place this file in the repository root.
+
+# --- Android Studio / IntelliJ ---
+.idea/
+*.iml
+.gradle/
+.kotlin/
+**/local.properties
+**/captures/
+**/.externalNativeBuild/
+**/.cxx/
+
+# --- Generated build outputs ---
+**/build/
+**/[Bb]in/
+**/[Oo]bj/
+**/[Dd]ebug/
+**/[Rr]elease/
+*.apk
+*.aab
+*.ap_
+output-metadata.json
+*.hprof
+
+# --- Visual Studio / .NET local state ---
+.vs/
+*.suo
+*.user
+*.userosscache
+*.rsuser
+*.binlog
+**/TestResults/
+*.trx
+
+# --- Signing keys and local secrets ---
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+.env
+.env.*
+!.env.example
+**/secrets.json
+
+# --- Temporary and machine-specific files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.part
+
+# --- Received user documents and generated outputs ---
+PrintLinkReceived/
+**/PrintLinkReceived/
+tests/output/
+tests/outputs/
+
+# NOTE: Do NOT ignore gradle/wrapper/gradle-wrapper.jar.
+# Gradle wrapper files, build scripts, .csproj, and source code belong in Git.
