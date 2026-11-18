@@ -118,37 +118,44 @@ public sealed class ReceiverService : IDisposable
                 return;
             }
 
-            using (client)
+            // Each phone gets its own task, so a second phone is answered (with the
+            // busy message) while a document is still arriving from the first.
+            _ = Task.Run(() => HandleConnectionAsync(client, folder, token), token);
+        }
+    }
+
+    private async Task HandleConnectionAsync(TcpClient client, string folder, CancellationToken token)
+    {
+        using (client)
+        {
+            client.ReceiveTimeout = ReadTimeoutMilliseconds;
+            client.SendTimeout = PrintLinkProtocol.WriteTimeoutMilliseconds;
+
+            string sender = client.Client.RemoteEndPoint?.ToString() ?? "unknown sender";
+
+            // One stream for the whole conversation. It must stay open until the
+            // failure reply is written: disposing it closes the socket.
+            NetworkStream stream = client.GetStream();
+
+            try
             {
-                client.ReceiveTimeout = ReadTimeoutMilliseconds;
-                client.SendTimeout = PrintLinkProtocol.WriteTimeoutMilliseconds;
+                await HandleClientAsync(stream, folder, sender, token).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // A dropped phone or a bad request must never crash the app.
+                ReportFailure(sender, ex.Message);
 
-                string sender = client.Client.RemoteEndPoint?.ToString() ?? "unknown sender";
-
+                // Tell the phone why, while the socket is still open.
                 try
                 {
-                    using NetworkStream stream = client.GetStream();
-                    await HandleClientAsync(stream, folder, sender, token).ConfigureAwait(false);
+                    await PrintLinkProtocol
+                        .WriteStatusAsync(stream, false, ex.Message, token)
+                        .ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    // A dropped phone or a bad request must never crash the app.
-                    ReportFailure(sender, ex.Message);
-
-                    // Tell the phone why, if it is still listening. This also drains
-                    // whatever it is still sending, so it shows our message instead of
-                    // a socket error.
-                    try
-                    {
-                        using NetworkStream stream = client.GetStream();
-                        await PrintLinkProtocol
-                            .WriteStatusAsync(stream, false, ex.Message, token)
-                            .ConfigureAwait(false);
-                    }
-                    catch
-                    {
-                        // The phone may already be gone, which is fine.
-                    }
+                    // The phone may already be gone, which is fine.
                 }
             }
         }
