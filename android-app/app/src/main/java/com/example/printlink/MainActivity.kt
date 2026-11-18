@@ -462,6 +462,8 @@ class MainActivity : ComponentActivity() {
             // Includes size validation, TCP transfer and receiver verification.
             val startTime = SystemClock.elapsedRealtimeNanos()
 
+            var awaitingReceiverReceipt = false
+
             val result = try {
                 runOnUiThread {
                     onStage("Checking document size...")
@@ -622,6 +624,7 @@ class MainActivity : ComponentActivity() {
                     // 8. Append checksum after file contents.
                     output.write(digest)
                     output.flush()
+                    awaitingReceiverReceipt = true
 
                     runOnUiThread {
                         onStage(
@@ -631,6 +634,7 @@ class MainActivity : ComponentActivity() {
 
                     val (success, message) =
                         readReceiverStatus(socket)
+                    awaitingReceiverReceipt = false
 
                     if (success) {
                         "Transfer successful! $message"
@@ -640,7 +644,18 @@ class MainActivity : ComponentActivity() {
                 }
 
             } catch (e: Exception) {
-                "Transfer failed: ${e.message}"
+                val reason = e.message
+                    ?.takeIf { it.isNotBlank() }
+                    ?: e.javaClass.simpleName
+
+                if (awaitingReceiverReceipt) {
+                    "Transfer status uncertain. " +
+                            "The receiver did not confirm whether the " +
+                            "document was saved. Check Windows before retrying. " +
+                            "($reason)"
+                } else {
+                    "Transfer failed: $reason"
+                }
             }
 
             val endTime = SystemClock.elapsedRealtimeNanos()
