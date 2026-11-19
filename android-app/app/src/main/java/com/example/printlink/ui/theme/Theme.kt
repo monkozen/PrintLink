@@ -37,6 +37,8 @@ private val LightColorScheme = lightColorScheme(
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFF91B8FF),
     onPrimary = Color(0xFF002A63),
+    primaryContainer = Color(0xFF243F71),
+    onPrimaryContainer = Color(0xFFE3EDFF),
 
     secondary = PrintLinkCyan,
     onSecondary = Color(0xFF003641),

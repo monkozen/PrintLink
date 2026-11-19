@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,6 +48,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+            val isDarkTheme = isSystemInDarkTheme()
+
+            val successColor = if (isDarkTheme) {
+                Color(0xFF45ED9D)
+            } else {
+                Color(0xFF237A4B)
+            }
+
+            val warningColor = if (isDarkTheme) {
+                Color(0xFFFFD27A)
+            } else {
+                Color(0xFF946200)
+            }
+
             var ipAddress by rememberSaveable {
                 mutableStateOf("")
             }
@@ -205,7 +220,8 @@ class MainActivity : ComponentActivity() {
                             text = "PrintLink",
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
 
                         Surface(
@@ -332,7 +348,7 @@ class MainActivity : ComponentActivity() {
 
                             val connectionColor = when {
                                 connectionSucceeded ->
-                                    Color(0xFF237A4B)
+                                    successColor
 
                                 connectionFailed ->
                                     MaterialTheme.colorScheme.error
@@ -477,7 +493,7 @@ class MainActivity : ComponentActivity() {
                                             text = eligibilityText,
                                             style = MaterialTheme.typography.labelMedium,
                                             color = if (documentReady)
-                                                Color(0xFF237A4B)
+                                                successColor
                                             else
                                                 MaterialTheme.colorScheme.error
                                         )
@@ -514,10 +530,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                             val statusColor = when {
-                                isSuccess -> Color(0xFF237A4B)
+                                isSuccess -> successColor
                                 isRejected || isFailed ->
                                     MaterialTheme.colorScheme.error
-                                isUncertain -> Color(0xFF946200)
+                                isUncertain -> warningColor
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
 
@@ -563,7 +579,10 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
-                            } else {
+                            } else if (
+                                !(selectedUri != null &&
+                                        fileStatus == "No document selected")
+                            ) {
                                 Text(
                                     text = statusTitle,
                                     style = MaterialTheme.typography.bodyMedium,
