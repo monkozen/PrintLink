@@ -12,6 +12,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -161,6 +163,7 @@ class MainActivity : ComponentActivity() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     verticalArrangement =
                         Arrangement.spacedBy(16.dp)
@@ -174,69 +177,93 @@ class MainActivity : ComponentActivity() {
                     Text(
                         text = "Offline Android-to-Windows File Sharing"
                     )
-
-                    OutlinedTextField(
-                        value = ipAddress,
-                        onValueChange = { ipAddress = it },
-                        label = {
-                            Text("Windows Receiver IP")
-                        },
-                        placeholder = {
-                            Text("192.168.1.105")
-                        },
-                        singleLine = true,
+                    ElevatedCard(
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Windows Receiver",
+                                style = MaterialTheme.typography.titleMedium
+                            )
 
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isConnecting,
-                        onClick = {
-                            val host = ipAddress.trim()
+                            Text(
+                                text = "Enter the local IP address of the Windows computer.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                            if (host.isEmpty()) {
-                                connectionStatus =
-                                    "Please enter an IP address"
-                            } else {
-                                isConnecting = true
-                                connectionStatus = "Connecting..."
+                            OutlinedTextField(
+                                value = ipAddress,
+                                onValueChange = {
+                                    ipAddress = it
+                                    connectionStatus = "Not checked"
+                                },
+                                label = {
+                                    Text("Windows Receiver IP")
+                                },
+                                placeholder = {
+                                    Text("192.168.1.105")
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                                val needsPermission =
-                                    Build.VERSION.SDK_INT >= 37 &&
-                                            applicationInfo.targetSdkVersion >= 37
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isConnecting,
+                                onClick = {
+                                    val host = ipAddress.trim()
 
-                                if (
-                                    needsPermission &&
-                                    checkSelfPermission(
-                                        localNetworkPermission
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    permissionLauncher.launch(
-                                        localNetworkPermission
-                                    )
-                                } else {
-                                    connectToReceiver(host) {
-                                        connectionStatus = it
-                                        isConnecting = false
+                                    if (host.isEmpty()) {
+                                        connectionStatus =
+                                            "Please enter an IP address"
+                                    } else {
+                                        isConnecting = true
+                                        connectionStatus = "Connecting..."
+
+                                        val needsPermission =
+                                            Build.VERSION.SDK_INT >= 37 &&
+                                                    applicationInfo.targetSdkVersion >= 37
+
+                                        if (
+                                            needsPermission &&
+                                            checkSelfPermission(
+                                                localNetworkPermission
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            permissionLauncher.launch(
+                                                localNetworkPermission
+                                            )
+                                        } else {
+                                            connectToReceiver(host) {
+                                                connectionStatus = it
+                                                isConnecting = false
+                                            }
+                                        }
                                     }
                                 }
+                            ) {
+                                Text(
+                                    if (isConnecting) "Connecting..."
+                                    else "Connect to Receiver"
+                                )
                             }
-                        }
-                    ) {
-                        Text(
-                            if (isConnecting) "Connecting..."
-                            else "Connect to Receiver"
-                        )
-                    }
 
-                    Text("Status: $connectionStatus")
+                            Text(
+                                text = "Last connection check: $connectionStatus",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } // Windows Receiver inner Column
+                    } // Windows Receiver ElevatedCard
 
-                    HorizontalDivider()
-
+                    // Document controls belong to the main, scrollable Column.
                     Text(
                         text = "Document Selection",
-                        style =
-                            MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge
                     )
 
                     Button(
@@ -462,6 +489,8 @@ class MainActivity : ComponentActivity() {
             // Includes size validation, TCP transfer and receiver verification.
             val startTime = SystemClock.elapsedRealtimeNanos()
 
+            var awaitingReceiverReceipt = false
+
             val result = try {
                 runOnUiThread {
                     onStage("Checking document size...")
@@ -622,6 +651,7 @@ class MainActivity : ComponentActivity() {
                     // 8. Append checksum after file contents.
                     output.write(digest)
                     output.flush()
+                    awaitingReceiverReceipt = true
 
                     runOnUiThread {
                         onStage(
@@ -631,6 +661,7 @@ class MainActivity : ComponentActivity() {
 
                     val (success, message) =
                         readReceiverStatus(socket)
+                    awaitingReceiverReceipt = false
 
                     if (success) {
                         "Transfer successful! $message"
@@ -640,7 +671,18 @@ class MainActivity : ComponentActivity() {
                 }
 
             } catch (e: Exception) {
-                "Transfer failed: ${e.message}"
+                val reason = e.message
+                    ?.takeIf { it.isNotBlank() }
+                    ?: e.javaClass.simpleName
+
+                if (awaitingReceiverReceipt) {
+                    "Transfer status uncertain. " +
+                            "The receiver did not confirm whether the " +
+                            "document was saved. Check Windows before retrying. " +
+                            "($reason)"
+                } else {
+                    "Transfer failed: $reason"
+                }
             }
 
             val endTime = SystemClock.elapsedRealtimeNanos()
