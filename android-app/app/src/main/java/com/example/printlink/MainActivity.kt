@@ -13,11 +13,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -131,6 +134,10 @@ class MainActivity : ComponentActivity() {
 
                                 size == 0L -> {
                                     fileStatus = "File is empty"
+                                }
+
+                                name.toByteArray(Charsets.UTF_8).size !in 1..200 -> {
+                                    fileStatus = "Filename is too long"
                                 }
 
                                 else -> {
@@ -252,132 +259,360 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            val connectionSucceeded =
+                                connectionStatus.startsWith("Server says:")
+
+                            val connectionFailed =
+                                connectionStatus.startsWith("Connection failed:") ||
+                                        connectionStatus.startsWith("Receiver error:") ||
+                                        connectionStatus == "Local network permission denied"
+
+                            val friendlyConnectionStatus = when {
+                                connectionSucceeded ->
+                                    "Receiver reachable"
+
+                                connectionFailed ->
+                                    "Receiver unreachable"
+
+                                connectionStatus == "Connecting..." ->
+                                    "Checking receiver..."
+
+                                connectionStatus == "Not connected" ||
+                                        connectionStatus == "Not checked" ->
+                                    "Receiver not checked"
+
+                                else -> connectionStatus
+                            }
+
+                            val connectionColor = when {
+                                connectionSucceeded ->
+                                    Color(0xFF237A4B)
+
+                                connectionFailed ->
+                                    MaterialTheme.colorScheme.error
+
+                                else ->
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+
                             Text(
-                                text = "Last connection check: $connectionStatus",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = friendlyConnectionStatus,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = connectionColor
                             )
-                        } // Windows Receiver inner Column
-                    } // Windows Receiver ElevatedCard
 
-                    // Document controls belong to the main, scrollable Column.
-                    Text(
-                        text = "Document Selection",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-
-                    Button(
-                        enabled = !isSending,
-                        onClick = {
-                            documentPicker.launch(
-                                arrayOf(
-                                    "application/pdf",
-                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            if (connectionSucceeded) {
+                                Text(
+                                    text = "Last connection check successful",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Choose Document")
-                    }
+                            }
 
-                    if (selectedName != null) {
-                        Text(
-                            text = "File: $selectedName"
-                        )
-
-                        val sizeLabel =
-                            selectedSize?.let {
-                                String.format(
-                                    Locale.US,
-                                    "%.2f MB",
-                                    it / 1_000_000.0
+                            if (connectionFailed) {
+                                Text(
+                                    text = "Check the IP address and make sure the Windows receiver is listening.",
+                                    style = MaterialTheme.typography.bodySmall
                                 )
-                            } ?: "Unknown"
 
-                        Text("Size: $sizeLabel")
-                    }
-
-                    Text("File Status: $fileStatus")
-
-
-                    if (isSending) {
-                        LinearProgressIndicator(
-                            progress = {
-                                transferProgress / 100f
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Text(
-                            text = "$transferProgress% of file bytes written",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = selectedUri != null &&
-                                selectedName != null &&
-                                !isSending,
-                        onClick = {
-                            val host = ipAddress.trim()
-                            val uriText = selectedUri
-                            val name = selectedName
-
-                            val needsPermission =
-                                Build.VERSION.SDK_INT >= 37 &&
-                                        applicationInfo.targetSdkVersion >= 37
-
-                            when {
-                                host.isEmpty() -> {
-                                    fileStatus = "Enter the receiver IP address"
+                                var showConnectionDetails by remember {
+                                    mutableStateOf(false)
                                 }
 
-                                uriText == null || name == null -> {
-                                    fileStatus = "Choose a document first"
+                                TextButton(
+                                    onClick = {
+                                        showConnectionDetails = !showConnectionDetails
+                                    }
+                                ) {
+                                    Text(
+                                        if (showConnectionDetails)
+                                            "Hide technical details"
+                                        else
+                                            "Show technical details"
+                                    )
                                 }
 
-                                needsPermission &&
-                                        checkSelfPermission(
-                                            localNetworkPermission
-                                        ) != PackageManager.PERMISSION_GRANTED -> {
-                                    fileStatus =
-                                        "Tap Connect first to grant network permission"
-                                }
-
-                                else -> {
-                                    isSending = true
-                                    transferProgress = 0
-                                    fileStatus = "Preparing document..."
-
-                                    sendDocument(
-                                        host = host,
-                                        uri = Uri.parse(uriText),
-                                        fileName = name,
-
-                                        onProgress = { percent ->
-                                            transferProgress = percent
-                                        },
-
-                                        onStage = { stage ->
-                                            fileStatus = stage
-                                        },
-
-                                        onResult = { result ->
-                                            fileStatus = result
-                                            isSending = false
-                                        }
+                                if (showConnectionDetails) {
+                                    Text(
+                                        text = connectionStatus,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
-                        }
+                        } // Windows Receiver inner Column
+                    } // Windows Receiver ElevatedCard
+
+                    // Document Selection card
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            if (isSending) "Sending..."
-                            else "Send Document"
-                        )
-                    }
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Document Selection",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            Text(
+                                text = "Select a PDF or DOCX document to send to Windows. Maximum size: 10 MB.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            OutlinedButton(
+                                enabled = !isSending,
+                                onClick = {
+                                    documentPicker.launch(
+                                        arrayOf(
+                                            "application/pdf",
+                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Choose Document")
+                            }
+
+                            if (selectedName != null) {
+                                val documentName = selectedName!!
+
+                                val documentType = when {
+                                    documentName.endsWith(".pdf", true) -> "PDF"
+                                    documentName.endsWith(".docx", true) -> "DOCX"
+                                    else -> "Unsupported"
+                                }
+
+                                val sizeLabel = selectedSize?.let {
+                                    String.format(
+                                        Locale.US,
+                                        "%.2f MB",
+                                        it / 1_000_000.0
+                                    )
+                                } ?: "Unknown size"
+
+                                val documentReady = selectedUri != null
+
+                                val eligibilityText = when {
+                                    !documentReady -> "Document not eligible for transfer"
+                                    selectedSize == null ->
+                                        "Selected - size will be checked before sending"
+                                    else -> "Ready for transfer"
+                                }
+
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                        alpha = 0.45f
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = documentName,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        Text(
+                                            text = "$documentType document · $sizeLabel",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Text(
+                                            text = eligibilityText,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (documentReady)
+                                                Color(0xFF237A4B)
+                                            else
+                                                MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+
+                            val isSuccess =
+                                fileStatus.startsWith("Transfer successful!")
+
+                            val isRejected =
+                                fileStatus.startsWith("Transfer rejected:")
+
+                            val isFailed =
+                                fileStatus.startsWith("Transfer failed:")
+
+                            val isUncertain =
+                                fileStatus.startsWith("Transfer status uncertain.")
+
+                            val hasFinalResult =
+                                isSuccess || isRejected || isFailed || isUncertain
+
+                            val isVerifying =
+                                isSending &&
+                                        fileStatus.startsWith("File data sent.")
+
+                            val statusTitle = when {
+                                isSuccess -> "Document received"
+                                isRejected -> "Document rejected"
+                                isFailed -> "Transfer failed"
+                                isUncertain -> "Confirmation not received"
+                                isVerifying -> "Waiting for Windows verification"
+                                else -> fileStatus
+                            }
+
+                            val statusColor = when {
+                                isSuccess -> Color(0xFF237A4B)
+                                isRejected || isFailed ->
+                                    MaterialTheme.colorScheme.error
+                                isUncertain -> Color(0xFF946200)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+
+                            if (hasFinalResult) {
+                                val details = when {
+                                    isSuccess ->
+                                        fileStatus.removePrefix("Transfer successful!")
+                                    isRejected ->
+                                        fileStatus.removePrefix("Transfer rejected:")
+                                    isFailed ->
+                                        fileStatus.removePrefix("Transfer failed:")
+                                    else ->
+                                        fileStatus.removePrefix("Transfer status uncertain.")
+                                }.trim()
+
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = statusColor.copy(alpha = 0.10f)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement =
+                                            Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = statusTitle,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = statusColor
+                                        )
+
+                                        Text(
+                                            text = details,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+
+                                        if (isUncertain) {
+                                            Text(
+                                                text = "Check the Windows receiver before retrying.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = statusColor
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = statusTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = statusColor
+                                )
+                            }
+
+                            if (isSending) {
+                                if (isVerifying) {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Text(
+                                        text = "File bytes written. Waiting for receiver confirmation...",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else {
+                                    LinearProgressIndicator(
+                                        progress = { transferProgress / 100f },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Text(
+                                        text = "$transferProgress% of file bytes written",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = selectedUri != null &&
+                                        selectedName != null &&
+                                        !isSending,
+                                onClick = {
+                                    val host = ipAddress.trim()
+                                    val uriText = selectedUri
+                                    val name = selectedName
+
+                                    val needsPermission =
+                                        Build.VERSION.SDK_INT >= 37 &&
+                                                applicationInfo.targetSdkVersion >= 37
+
+                                    when {
+                                        host.isEmpty() -> {
+                                            fileStatus = "Enter the receiver IP address"
+                                        }
+
+                                        uriText == null || name == null -> {
+                                            fileStatus = "Choose a document first"
+                                        }
+
+                                        needsPermission &&
+                                                checkSelfPermission(
+                                                    localNetworkPermission
+                                                ) != PackageManager.PERMISSION_GRANTED -> {
+                                            fileStatus =
+                                                "Tap Connect first to grant network permission"
+                                        }
+
+                                        else -> {
+                                            isSending = true
+                                            transferProgress = 0
+                                            fileStatus = "Preparing document..."
+
+                                            sendDocument(
+                                                host = host,
+                                                uri = Uri.parse(uriText),
+                                                fileName = name,
+
+                                                onProgress = { percent ->
+                                                    transferProgress = percent
+                                                },
+
+                                                onStage = { stage ->
+                                                    fileStatus = stage
+                                                },
+
+                                                onResult = { result ->
+                                                    fileStatus = result
+                                                    isSending = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (isSending) "Sending..."
+                                    else "Send Document"
+                                )
+                            }
+                        } // Closes Document Selection Column
+                    } // Closes Document Selection ElevatedCard
 
                 }
             }
