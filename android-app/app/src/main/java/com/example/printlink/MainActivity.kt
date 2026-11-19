@@ -135,6 +135,10 @@ class MainActivity : ComponentActivity() {
                                     fileStatus = "File is empty"
                                 }
 
+                                name.toByteArray(Charsets.UTF_8).size !in 1..200 -> {
+                                    fileStatus = "Filename is too long"
+                                }
+
                                 else -> {
                                     contentResolver
                                         .takePersistableUriPermission(
@@ -373,20 +377,63 @@ class MainActivity : ComponentActivity() {
                             }
 
                             if (selectedName != null) {
-                                Text(
-                                    text = "File: $selectedName"
-                                )
+                                val documentName = selectedName!!
 
-                                val sizeLabel =
-                                    selectedSize?.let {
-                                        String.format(
-                                            Locale.US,
-                                            "%.2f MB",
-                                            it / 1_000_000.0
+                                val documentType = when {
+                                    documentName.endsWith(".pdf", true) -> "PDF"
+                                    documentName.endsWith(".docx", true) -> "DOCX"
+                                    else -> "Unsupported"
+                                }
+
+                                val sizeLabel = selectedSize?.let {
+                                    String.format(
+                                        Locale.US,
+                                        "%.2f MB",
+                                        it / 1_000_000.0
+                                    )
+                                } ?: "Unknown size"
+
+                                val documentReady = selectedUri != null
+
+                                val eligibilityText = when {
+                                    !documentReady -> "Document not eligible for transfer"
+                                    selectedSize == null ->
+                                        "Selected - size will be checked before sending"
+                                    else -> "Ready for transfer"
+                                }
+
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                        alpha = 0.45f
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = documentName,
+                                            style = MaterialTheme.typography.titleSmall
                                         )
-                                    } ?: "Unknown"
 
-                                Text("Size: $sizeLabel")
+                                        Text(
+                                            text = "$documentType document · $sizeLabel",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Text(
+                                            text = eligibilityText,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (documentReady)
+                                                Color(0xFF237A4B)
+                                            else
+                                                MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
                             }
 
                             val isSuccess =
