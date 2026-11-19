@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf("")
             }
 
-            var connectionStatus by remember {
+            var connectionStatus by rememberSaveable {
                 mutableStateOf("Not connected")
             }
 
