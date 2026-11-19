@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,14 +26,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.printlink.ui.theme.PrintLinkTheme
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.security.MessageDigest
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -86,17 +85,12 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf<Long?>(null)
             }
 
-            var fileStatus by remember {
-                mutableStateOf("No document selected")
-            }
-
-            var isSending by remember {
-                mutableStateOf(false)
-            }
-
-            var transferProgress by remember {
-                mutableIntStateOf(0)
-            }
+            // Activity-scoped ViewModel survives rotation and owns the active transfer.
+            val transferVm: TransferViewModel = viewModel()
+            val transferState by transferVm.uiState.collectAsStateWithLifecycle()
+            val fileStatus = transferState.status
+            val isSending = transferState.isSending
+            val transferProgress = transferState.progress
 
             val permissionLauncher =
                 rememberLauncherForActivityResult(
@@ -125,8 +119,7 @@ class MainActivity : ComponentActivity() {
                         selectedUri = null
                         selectedName = null
                         selectedSize = null
-                        transferProgress = 0
-                        fileStatus = "Checking document..."
+                        transferVm.beginDocumentSelection()
 
                         try {
                             val (name, size) = getDocumentInfo(uri)
@@ -142,21 +135,19 @@ class MainActivity : ComponentActivity() {
 
                             when {
                                 !allowedType -> {
-                                    fileStatus =
-                                        "Only PDF and DOCX are allowed"
+                                    transferVm.setStatus("Only PDF and DOCX are allowed")
                                 }
 
                                 size != null && size > maxFileSize -> {
-                                    fileStatus =
-                                        "File exceeds the 10 MB limit"
+                                    transferVm.setStatus("File exceeds the 10 MB limit")
                                 }
 
                                 size == 0L -> {
-                                    fileStatus = "File is empty"
+                                    transferVm.setStatus("File is empty")
                                 }
 
                                 name.toByteArray(Charsets.UTF_8).size !in 1..200 -> {
-                                    fileStatus = "Filename is too long"
+                                    transferVm.setStatus("Filename is too long")
                                 }
 
                                 else -> {
@@ -170,17 +161,19 @@ class MainActivity : ComponentActivity() {
                                     // as transferable selections.
                                     selectedUri = uri.toString()
 
-                                    fileStatus =
+                                    transferVm.setStatus(
                                         if (size == null)
                                             "Selected; size will be checked before sending"
                                         else
                                             "Document ready for transfer"
+                                    )
                                 }
                             }
                         } catch (e: Exception) {
                             selectedUri = null
-                            fileStatus =
+                            transferVm.setStatus(
                                 "Unable to open file: ${e.message}"
+                            )
                         }
                     }
                 }
@@ -629,43 +622,26 @@ class MainActivity : ComponentActivity() {
 
                                     when {
                                         host.isEmpty() -> {
-                                            fileStatus = "Enter the receiver IP address"
+                                            transferVm.setStatus("Enter the receiver IP address")
                                         }
 
                                         uriText == null || name == null -> {
-                                            fileStatus = "Choose a document first"
+                                            transferVm.setStatus("Choose a document first")
                                         }
 
                                         needsPermission &&
                                                 checkSelfPermission(
                                                     localNetworkPermission
                                                 ) != PackageManager.PERMISSION_GRANTED -> {
-                                            fileStatus =
-                                                "Tap Connect first to grant network permission"
+                                            transferVm.setStatus("Tap Connect first to grant network permission")
                                         }
 
                                         else -> {
-                                            isSending = true
-                                            transferProgress = 0
-                                            fileStatus = "Preparing document..."
-
-                                            sendDocument(
+                                            transferVm.startTransfer(
+                                                resolver = applicationContext.contentResolver,
                                                 host = host,
                                                 uri = Uri.parse(uriText),
-                                                fileName = name,
-
-                                                onProgress = { percent ->
-                                                    transferProgress = percent
-                                                },
-
-                                                onStage = { stage ->
-                                                    fileStatus = stage
-                                                },
-
-                                                onResult = { result ->
-                                                    fileStatus = result
-                                                    isSending = false
-                                                }
+                                                fileName = name
                                             )
                                         }
                                     }
@@ -777,232 +753,6 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private fun sendDocument(
-        host: String,
-        uri: Uri,
-        fileName: String,
-        onProgress: (Int) -> Unit,
-        onStage: (String) -> Unit,
-        onResult: (String) -> Unit
-    ) {
-        Thread {
-            // Includes size validation, TCP transfer and receiver verification.
-            val startTime = SystemClock.elapsedRealtimeNanos()
-
-            var awaitingReceiverReceipt = false
-
-            val result = try {
-                runOnUiThread {
-                    onStage("Checking document size...")
-                }
-
-                require(
-                    fileName.endsWith(".pdf", true) ||
-                            fileName.endsWith(".docx", true)
-                ) {
-                    "Only PDF and DOCX files are allowed"
-                }
-
-                val nameBytes =
-                    fileName.toByteArray(Charsets.UTF_8)
-
-                require(nameBytes.size in 1..200) {
-                    "Filename is too long"
-                }
-
-                // 1. Count the actual file bytes.
-                val fileSize =
-                    contentResolver.openInputStream(uri)?.use { input ->
-
-                        val buffer = ByteArray(65536)
-                        var total = 0L
-
-                        while (true) {
-                            val count = input.read(buffer)
-
-                            if (count == -1) break
-
-                            total += count
-
-                            if (total > 10_000_000L) {
-                                throw IOException(
-                                    "File exceeds 10 MB"
-                                )
-                            }
-                        }
-
-                        total
-
-                    } ?: throw IOException(
-                        "Cannot open selected document"
-                    )
-
-                require(fileSize > 0) {
-                    "Cannot send an empty document"
-                }
-
-                // 2. Establish TCP connection.
-                Socket().use { socket ->
-
-                    socket.connect(
-                        InetSocketAddress(host, 5050),
-                        5000
-                    )
-
-                    socket.soTimeout = 45000
-
-                    val output = DataOutputStream(
-                        BufferedOutputStream(
-                            socket.getOutputStream()
-                        )
-                    )
-
-                    // 3. Send PLK1 with operation 3.
-                    output.write(
-                        "PLK1".toByteArray(Charsets.US_ASCII)
-                    )
-
-                    output.writeByte(3)
-
-                    output.writeInt(nameBytes.size)
-                    output.write(nameBytes)
-                    output.writeLong(fileSize)
-
-                    runOnUiThread {
-                        onStage("Sending document...")
-                    }
-
-                    // 5. Initialize SHA-256.
-                    val hasher =
-                        MessageDigest.getInstance("SHA-256")
-
-                    // 6. Stream file bytes and update hash.
-                    val input =
-                        contentResolver.openInputStream(uri)
-                            ?: throw IOException(
-                                "Cannot reopen document"
-                            )
-
-                    input.use { source ->
-                        val buffer = ByteArray(65536)
-                        var sent = 0L
-                        var lastReportedPercent = -1
-
-                        while (sent < fileSize) {
-
-                            val toRead = minOf(
-                                buffer.size.toLong(),
-                                fileSize - sent
-                            ).toInt()
-
-                            val count = source.read(
-                                buffer,
-                                0,
-                                toRead
-                            )
-
-                            if (count == -1) {
-                                throw IOException(
-                                    "Document ended before expected size"
-                                )
-                            }
-
-
-                            if (count > 0) {
-                                // Write document bytes to the TCP stream.
-                                output.write(
-                                    buffer,
-                                    0,
-                                    count
-                                )
-
-                                // Include the same bytes in SHA-256.
-                                hasher.update(
-                                    buffer,
-                                    0,
-                                    count
-                                )
-
-                                sent += count
-
-                                // Calculate progress from bytes written.
-                                val percent = (
-                                        sent * 100L / fileSize
-                                        ).toInt()
-
-                                // Only update the UI when the percentage changes.
-                                if (percent != lastReportedPercent) {
-                                    lastReportedPercent = percent
-
-                                    runOnUiThread {
-                                        onProgress(percent)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 7. Finalize the 32-byte SHA-256 digest.
-                    val digest = hasher.digest()
-                    require(digest.size == 32) {
-                        "Invalid SHA-256 digest length"
-                    }
-
-                    // 8. Append checksum after file contents.
-                    output.write(digest)
-                    output.flush()
-                    awaitingReceiverReceipt = true
-
-                    runOnUiThread {
-                        onStage(
-                            "File data sent. Waiting for SHA-256 verification..."
-                        )
-                    }
-
-                    val (success, message) =
-                        readReceiverStatus(socket)
-                    awaitingReceiverReceipt = false
-
-                    if (success) {
-                        "Transfer successful! $message"
-                    } else {
-                        "Transfer rejected: $message"
-                    }
-                }
-
-            } catch (e: Exception) {
-                val reason = e.message
-                    ?.takeIf { it.isNotBlank() }
-                    ?: e.javaClass.simpleName
-
-                if (awaitingReceiverReceipt) {
-                    "Transfer status uncertain. " +
-                            "The receiver did not confirm whether the " +
-                            "document was saved. Check Windows before retrying. " +
-                            "($reason)"
-                } else {
-                    "Transfer failed: $reason"
-                }
-            }
-
-            val endTime = SystemClock.elapsedRealtimeNanos()
-            val durationSeconds =
-                (endTime - startTime) / 1_000_000_000.0
-
-            val formattedTime = String.format(
-                Locale.US,
-                "%.3f",
-                durationSeconds
-            )
-
-            runOnUiThread {
-                onResult(
-                    "$result\nEnd-to-end duration: $formattedTime seconds"
-                )
-            }
-        }.start()
-    }
-
     private fun readReceiverStatus(
         socket: Socket
     ): Pair<Boolean, String> {
@@ -1032,3 +782,4 @@ class MainActivity : ComponentActivity() {
         )
     }
 }
+
