@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,9 +19,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.example.printlink.ui.theme.PrintLinkTheme
 import androidx.compose.ui.unit.dp
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -166,23 +170,65 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-            MaterialTheme {
+            PrintLinkTheme {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
                         .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     verticalArrangement =
                         Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "PrintLink",
-                        style =
-                            MaterialTheme.typography.headlineMedium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "PL",
+                                modifier = Modifier.padding(
+                                    horizontal = 12.dp,
+                                    vertical = 10.dp
+                                ),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "PrintLink",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(50.dp)
+                        ) {
+                            Text(
+                                text = "SENDER",
+                                modifier = Modifier.padding(
+                                    horizontal = 10.dp,
+                                    vertical = 6.dp
+                                ),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
                     Text(
-                        text = "Offline Android-to-Windows File Sharing"
+                        text = "Offline Android-to-Windows File Sharing",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth()

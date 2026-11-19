@@ -1,11 +1,11 @@
+
 package com.example.printlink.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val PrintLinkBlue = Color(0xFF1768FF)
+val PrintLinkDeepBlue = Color(0xFF123CBD)
+val PrintLinkCyan = Color(0xFF19E6FF)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val PrintLinkBackground = Color(0xFFF5F8FF)
+val PrintLinkInk = Color(0xFF183153)
