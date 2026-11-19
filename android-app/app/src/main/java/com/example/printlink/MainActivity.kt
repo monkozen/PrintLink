@@ -254,11 +254,87 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            val connectionSucceeded =
+                                connectionStatus.startsWith("Server says:")
+
+                            val connectionFailed =
+                                connectionStatus.startsWith("Connection failed:") ||
+                                        connectionStatus.startsWith("Receiver error:") ||
+                                        connectionStatus == "Local network permission denied"
+
+                            val friendlyConnectionStatus = when {
+                                connectionSucceeded ->
+                                    "Receiver reachable"
+
+                                connectionFailed ->
+                                    "Receiver unreachable"
+
+                                connectionStatus == "Connecting..." ->
+                                    "Checking receiver..."
+
+                                connectionStatus == "Not connected" ||
+                                        connectionStatus == "Not checked" ->
+                                    "Receiver not checked"
+
+                                else -> connectionStatus
+                            }
+
+                            val connectionColor = when {
+                                connectionSucceeded ->
+                                    Color(0xFF237A4B)
+
+                                connectionFailed ->
+                                    MaterialTheme.colorScheme.error
+
+                                else ->
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+
                             Text(
-                                text = "Last connection check: $connectionStatus",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = friendlyConnectionStatus,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = connectionColor
                             )
+
+                            if (connectionSucceeded) {
+                                Text(
+                                    text = "Last connection check successful",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (connectionFailed) {
+                                Text(
+                                    text = "Check the IP address and make sure the Windows receiver is listening.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+
+                                var showConnectionDetails by remember {
+                                    mutableStateOf(false)
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        showConnectionDetails = !showConnectionDetails
+                                    }
+                                ) {
+                                    Text(
+                                        if (showConnectionDetails)
+                                            "Hide technical details"
+                                        else
+                                            "Show technical details"
+                                    )
+                                }
+
+                                if (showConnectionDetails) {
+                                    Text(
+                                        text = connectionStatus,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         } // Windows Receiver inner Column
                     } // Windows Receiver ElevatedCard
 
