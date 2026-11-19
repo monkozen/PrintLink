@@ -311,7 +311,46 @@ class MainActivity : ComponentActivity() {
                                 Text("Size: $sizeLabel")
                             }
 
-                            Text("File Status: $fileStatus")
+                            val isSuccess =
+                                fileStatus.startsWith("Transfer successful!")
+
+                            val isRejected =
+                                fileStatus.startsWith("Transfer rejected:")
+
+                            val isFailed =
+                                fileStatus.startsWith("Transfer failed:")
+
+                            val isUncertain =
+                                fileStatus.startsWith("Transfer status uncertain.")
+
+                            val statusTitle = when {
+                                isSuccess -> "Document received"
+                                isRejected -> "Document rejected"
+                                isFailed -> "Transfer failed"
+                                isUncertain -> "Confirmation not received"
+                                else -> fileStatus
+                            }
+
+                            val statusColor = when {
+                                isSuccess -> MaterialTheme.colorScheme.primary
+                                isRejected || isFailed -> MaterialTheme.colorScheme.error
+                                isUncertain -> MaterialTheme.colorScheme.tertiary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+
+                            Text(
+                                text = statusTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = statusColor
+                            )
+
+                            if (isSuccess || isRejected || isFailed || isUncertain) {
+                                Text(
+                                    text = fileStatus,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
                             if (isSending) {
                                 LinearProgressIndicator(
