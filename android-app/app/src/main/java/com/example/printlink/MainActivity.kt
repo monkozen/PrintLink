@@ -13,10 +13,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import java.io.BufferedInputStream
@@ -323,47 +325,101 @@ class MainActivity : ComponentActivity() {
                             val isUncertain =
                                 fileStatus.startsWith("Transfer status uncertain.")
 
+                            val hasFinalResult =
+                                isSuccess || isRejected || isFailed || isUncertain
+
+                            val isVerifying =
+                                isSending &&
+                                        fileStatus.startsWith("File data sent.")
+
                             val statusTitle = when {
                                 isSuccess -> "Document received"
                                 isRejected -> "Document rejected"
                                 isFailed -> "Transfer failed"
                                 isUncertain -> "Confirmation not received"
+                                isVerifying -> "Waiting for Windows verification"
                                 else -> fileStatus
                             }
 
                             val statusColor = when {
-                                isSuccess -> MaterialTheme.colorScheme.primary
-                                isRejected || isFailed -> MaterialTheme.colorScheme.error
-                                isUncertain -> MaterialTheme.colorScheme.tertiary
+                                isSuccess -> Color(0xFF237A4B)
+                                isRejected || isFailed ->
+                                    MaterialTheme.colorScheme.error
+                                isUncertain -> Color(0xFF946200)
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
 
-                            Text(
-                                text = statusTitle,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = statusColor
-                            )
+                            if (hasFinalResult) {
+                                val details = when {
+                                    isSuccess ->
+                                        fileStatus.removePrefix("Transfer successful!")
+                                    isRejected ->
+                                        fileStatus.removePrefix("Transfer rejected:")
+                                    isFailed ->
+                                        fileStatus.removePrefix("Transfer failed:")
+                                    else ->
+                                        fileStatus.removePrefix("Transfer status uncertain.")
+                                }.trim()
 
-                            if (isSuccess || isRejected || isFailed || isUncertain) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = statusColor.copy(alpha = 0.10f)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement =
+                                            Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = statusTitle,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = statusColor
+                                        )
+
+                                        Text(
+                                            text = details,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+
+                                        if (isUncertain) {
+                                            Text(
+                                                text = "Check the Windows receiver before retrying.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = statusColor
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
                                 Text(
-                                    text = fileStatus,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = statusTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = statusColor
                                 )
                             }
 
                             if (isSending) {
-                                LinearProgressIndicator(
-                                    progress = {
-                                        transferProgress / 100f
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                                if (isVerifying) {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
 
-                                Text(
-                                    text = "$transferProgress% of file bytes written",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                                    Text(
+                                        text = "File bytes written. Waiting for receiver confirmation...",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else {
+                                    LinearProgressIndicator(
+                                        progress = { transferProgress / 100f },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Text(
+                                        text = "$transferProgress% of file bytes written",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
                             }
 
                             Button(
