@@ -260,124 +260,138 @@ class MainActivity : ComponentActivity() {
                         } // Windows Receiver inner Column
                     } // Windows Receiver ElevatedCard
 
-                    // Document controls belong to the main, scrollable Column.
-                    Text(
-                        text = "Document Selection",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-
-                    Button(
-                        enabled = !isSending,
-                        onClick = {
-                            documentPicker.launch(
-                                arrayOf(
-                                    "application/pdf",
-                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                )
-                            )
-                        },
+                    // Document Selection card
+                    ElevatedCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Choose Document")
-                    }
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Document Selection",
+                                style = MaterialTheme.typography.titleMedium
+                            )
 
-                    if (selectedName != null) {
-                        Text(
-                            text = "File: $selectedName"
-                        )
+                            Text(
+                                text = "Select a PDF or DOCX document to send to Windows. Maximum size: 10 MB.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                        val sizeLabel =
-                            selectedSize?.let {
-                                String.format(
-                                    Locale.US,
-                                    "%.2f MB",
-                                    it / 1_000_000.0
-                                )
-                            } ?: "Unknown"
-
-                        Text("Size: $sizeLabel")
-                    }
-
-                    Text("File Status: $fileStatus")
-
-
-                    if (isSending) {
-                        LinearProgressIndicator(
-                            progress = {
-                                transferProgress / 100f
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Text(
-                            text = "$transferProgress% of file bytes written",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = selectedUri != null &&
-                                selectedName != null &&
-                                !isSending,
-                        onClick = {
-                            val host = ipAddress.trim()
-                            val uriText = selectedUri
-                            val name = selectedName
-
-                            val needsPermission =
-                                Build.VERSION.SDK_INT >= 37 &&
-                                        applicationInfo.targetSdkVersion >= 37
-
-                            when {
-                                host.isEmpty() -> {
-                                    fileStatus = "Enter the receiver IP address"
-                                }
-
-                                uriText == null || name == null -> {
-                                    fileStatus = "Choose a document first"
-                                }
-
-                                needsPermission &&
-                                        checkSelfPermission(
-                                            localNetworkPermission
-                                        ) != PackageManager.PERMISSION_GRANTED -> {
-                                    fileStatus =
-                                        "Tap Connect first to grant network permission"
-                                }
-
-                                else -> {
-                                    isSending = true
-                                    transferProgress = 0
-                                    fileStatus = "Preparing document..."
-
-                                    sendDocument(
-                                        host = host,
-                                        uri = Uri.parse(uriText),
-                                        fileName = name,
-
-                                        onProgress = { percent ->
-                                            transferProgress = percent
-                                        },
-
-                                        onStage = { stage ->
-                                            fileStatus = stage
-                                        },
-
-                                        onResult = { result ->
-                                            fileStatus = result
-                                            isSending = false
-                                        }
+                            OutlinedButton(
+                                enabled = !isSending,
+                                onClick = {
+                                    documentPicker.launch(
+                                        arrayOf(
+                                            "application/pdf",
+                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                        )
                                     )
-                                }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Choose Document")
                             }
-                        }
-                    ) {
-                        Text(
-                            if (isSending) "Sending..."
-                            else "Send Document"
-                        )
-                    }
+
+                            if (selectedName != null) {
+                                Text(
+                                    text = "File: $selectedName"
+                                )
+
+                                val sizeLabel =
+                                    selectedSize?.let {
+                                        String.format(
+                                            Locale.US,
+                                            "%.2f MB",
+                                            it / 1_000_000.0
+                                        )
+                                    } ?: "Unknown"
+
+                                Text("Size: $sizeLabel")
+                            }
+
+                            Text("File Status: $fileStatus")
+
+                            if (isSending) {
+                                LinearProgressIndicator(
+                                    progress = {
+                                        transferProgress / 100f
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Text(
+                                    text = "$transferProgress% of file bytes written",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = selectedUri != null &&
+                                        selectedName != null &&
+                                        !isSending,
+                                onClick = {
+                                    val host = ipAddress.trim()
+                                    val uriText = selectedUri
+                                    val name = selectedName
+
+                                    val needsPermission =
+                                        Build.VERSION.SDK_INT >= 37 &&
+                                                applicationInfo.targetSdkVersion >= 37
+
+                                    when {
+                                        host.isEmpty() -> {
+                                            fileStatus = "Enter the receiver IP address"
+                                        }
+
+                                        uriText == null || name == null -> {
+                                            fileStatus = "Choose a document first"
+                                        }
+
+                                        needsPermission &&
+                                                checkSelfPermission(
+                                                    localNetworkPermission
+                                                ) != PackageManager.PERMISSION_GRANTED -> {
+                                            fileStatus =
+                                                "Tap Connect first to grant network permission"
+                                        }
+
+                                        else -> {
+                                            isSending = true
+                                            transferProgress = 0
+                                            fileStatus = "Preparing document..."
+
+                                            sendDocument(
+                                                host = host,
+                                                uri = Uri.parse(uriText),
+                                                fileName = name,
+
+                                                onProgress = { percent ->
+                                                    transferProgress = percent
+                                                },
+
+                                                onStage = { stage ->
+                                                    fileStatus = stage
+                                                },
+
+                                                onResult = { result ->
+                                                    fileStatus = result
+                                                    isSending = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (isSending) "Sending..."
+                                    else "Send Document"
+                                )
+                            }
+                        } // Closes Document Selection Column
+                    } // Closes Document Selection ElevatedCard
 
                 }
             }
